@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SavedPost } from '../types'
 import {
+  categoryForPost,
   collectHashtags,
   computeLibraryStats,
   tokenizeDescription,
@@ -47,6 +48,55 @@ describe('collectHashtags', () => {
   })
 })
 
+describe('reel charts', () => {
+  it('counts reels per month and leaves a gap month at zero', () => {
+    const stats = computeLibraryStats([
+      post({
+        id: 'jan',
+        url: 'https://www.instagram.com/reel/jan/',
+        savedAt: new Date(2024, 0, 10).getTime(),
+        caption: 'Weeknight #pasta recipe',
+      }),
+      post({
+        id: 'mar',
+        url: 'https://www.instagram.com/reel/mar/',
+        savedAt: new Date(2024, 2, 10).getTime(),
+        caption: 'New #outfit ootd',
+      }),
+      post({
+        id: 'photo',
+        url: 'https://www.instagram.com/p/photo/',
+        savedAt: new Date(2024, 1, 10).getTime(),
+        caption: 'ignored photo',
+      }),
+    ])
+    expect(stats.chartSubject).toBe('reels')
+    expect(stats.reelsByMonth.map((bar) => [bar.month, bar.count])).toEqual([
+      [0, 1],
+      [1, 0],
+      [2, 1],
+    ])
+    expect(stats.reelCategories.map((slice) => slice.label).sort()).toEqual(['Fashion', 'Food'])
+  })
+
+  it('falls back to every save when nothing is a reel', () => {
+    const stats = computeLibraryStats([
+      post({
+        id: 'a',
+        savedAt: new Date(2024, 3, 2).getTime(),
+        caption: 'Morning #yoga flow',
+      }),
+    ])
+    expect(stats.chartSubject).toBe('saves')
+    expect(stats.reelsByMonth).toHaveLength(1)
+    expect(stats.reelCategories[0]).toMatchObject({ label: 'Fitness', count: 1 })
+  })
+
+  it('sends an unmatched caption to Other', () => {
+    expect(categoryForPost({ caption: 'Hello there friend', hashtags: [] })).toBe('Other')
+  })
+})
+
 describe('computeLibraryStats', () => {
   it('returns empty stats for an empty library', () => {
     expect(computeLibraryStats([])).toEqual({
@@ -54,6 +104,9 @@ describe('computeLibraryStats', () => {
       topWord: null,
       busiestMonth: null,
       topHashtag: null,
+      chartSubject: 'saves',
+      reelsByMonth: [],
+      reelCategories: [],
     })
   })
 

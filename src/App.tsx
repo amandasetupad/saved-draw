@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { drawRandom } from './lib/draw'
 import { importInstagramFile, parsePastedLinks } from './lib/import'
+import { LibraryCharts } from './components/StatCharts'
 import { computeLibraryStats } from './lib/stats'
 import {
   loadPosts,
@@ -26,6 +27,10 @@ function formatWhen(ms?: number): string {
     month: 'short',
     day: 'numeric',
   })
+}
+
+function breakableHandle(author: string): string {
+  return `@${author}`.replace(/([._])/g, '$1\u200b')
 }
 
 export default function App() {
@@ -184,147 +189,8 @@ export default function App() {
         </main>
       ) : (
         <main>
-          <section className="draw-stage" aria-labelledby="draw-heading">
-            <h1 id="draw-heading">Draw one</h1>
-            <p className="lede">
-              Pick at random from your Instagram saves. Mark done or skip — your
-              list stays in this browser.
-            </p>
-
-            <div className="draw-controls">
-              <label className="pool">
-                <span>Pool</span>
-                <select
-                  value={drawPool}
-                  onChange={(e) => setDrawPool(e.target.value as DrawPool)}
-                >
-                  <option value="todo">Still to do ({counts.todo})</option>
-                  <option value="all">Everything ({counts.all})</option>
-                </select>
-              </label>
-              <button type="button" className="draw-btn" onClick={handleDraw}>
-                Draw
-              </button>
-            </div>
-
-            {drawn ? (
-              <article className="drawn" key={drawn.id}>
-                <p className="drawn-kicker">{statusLabel(drawn.status)}</p>
-                <h2>
-                  {drawn.author ? `@${drawn.author}` : drawn.shortcode}
-                </h2>
-                {drawn.collection ? (
-                  <p className="meta">Collection · {drawn.collection}</p>
-                ) : null}
-                {drawn.caption ? (
-                  <p className="caption">{drawn.caption}</p>
-                ) : null}
-                <a className="open" href={drawn.url} target="_blank" rel="noreferrer">
-                  Open on Instagram
-                </a>
-                <div className="actions">
-                  <button type="button" onClick={() => mark(drawn.id, 'completed')}>
-                    Completed
-                  </button>
-                  <button type="button" onClick={() => mark(drawn.id, 'wont_do')}>
-                    Won&apos;t do
-                  </button>
-                  {drawn.status !== 'todo' ? (
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => mark(drawn.id, 'todo')}
-                    >
-                      Undo
-                    </button>
-                  ) : null}
-                  <button type="button" className="ghost" onClick={handleDraw}>
-                    Draw again
-                  </button>
-                </div>
-              </article>
-            ) : (
-              <div className="drawn empty">
-                <p>Press Draw when you&apos;re ready.</p>
-              </div>
-            )}
-          </section>
-
-          <section className="panel stats-panel" aria-labelledby="stats-heading">
-            <h2 id="stats-heading">Library stats</h2>
-            <p className="hint">
-              Patterns across every saved post in this browser — including
-              completed and won&apos;t do.
-            </p>
-            {posts.length === 0 ? (
-              <p className="empty-list">Import some saves to see patterns here.</p>
-            ) : (
-              <ul className="stats-grid">
-                <li>
-                  <p className="stats-label">Oldest save</p>
-                  {stats.oldest ? (
-                    <>
-                      <a href={stats.oldest.url} target="_blank" rel="noreferrer">
-                        {stats.oldest.author
-                          ? `@${stats.oldest.author}`
-                          : stats.oldest.shortcode}
-                      </a>
-                      <p className="stats-detail">
-                        Saved {formatWhen(stats.oldest.savedAt)}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="stats-value muted">No save dates yet</p>
-                  )}
-                </li>
-                <li>
-                  <p className="stats-label">Top word</p>
-                  {stats.topWord ? (
-                    <>
-                      <p className="stats-value">{stats.topWord.value}</p>
-                      <p className="stats-detail">
-                        {stats.topWord.count} time
-                        {stats.topWord.count === 1 ? '' : 's'} in descriptions
-                      </p>
-                    </>
-                  ) : (
-                    <p className="stats-value muted">No description text yet</p>
-                  )}
-                </li>
-                <li>
-                  <p className="stats-label">Busiest month</p>
-                  {stats.busiestMonth ? (
-                    <>
-                      <p className="stats-value">{stats.busiestMonth.label}</p>
-                      <p className="stats-detail">
-                        {stats.busiestMonth.count} save
-                        {stats.busiestMonth.count === 1 ? '' : 's'}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="stats-value muted">No save dates yet</p>
-                  )}
-                </li>
-                <li>
-                  <p className="stats-label">Popular hashtag</p>
-                  {stats.topHashtag ? (
-                    <>
-                      <p className="stats-value">{stats.topHashtag.value}</p>
-                      <p className="stats-detail">
-                        in {stats.topHashtag.count} post
-                        {stats.topHashtag.count === 1 ? '' : 's'}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="stats-value muted">No hashtags found</p>
-                  )}
-                </li>
-              </ul>
-            )}
-          </section>
-
-          <section className="panel" aria-labelledby="add-heading">
-            <h2 id="add-heading">Add saves</h2>
+          <section className="panel start-panel" aria-labelledby="add-heading">
+            <h2 id="add-heading">Start here</h2>
             <p className="hint">
               Instagram doesn&apos;t let a website read your private Saved page. Download
               every saved post in one export, then import the file here. That works
@@ -405,6 +271,149 @@ export default function App() {
                 {message}
               </p>
             ) : null}
+          </section>
+
+
+          <section className="draw-stage" aria-labelledby="draw-heading">
+            <h1 id="draw-heading">Draw one</h1>
+            <p className="lede">
+              Pick at random from your Instagram saves. Mark done or skip — your
+              list stays in this browser.
+            </p>
+
+            <div className="draw-controls">
+              <label className="pool">
+                <span>Pool</span>
+                <select
+                  value={drawPool}
+                  onChange={(e) => setDrawPool(e.target.value as DrawPool)}
+                >
+                  <option value="todo">Still to do ({counts.todo})</option>
+                  <option value="all">Everything ({counts.all})</option>
+                </select>
+              </label>
+              <button type="button" className="draw-btn" onClick={handleDraw}>
+                Draw
+              </button>
+            </div>
+
+            {drawn ? (
+              <article className="drawn" key={drawn.id}>
+                <p className="drawn-kicker">{statusLabel(drawn.status)}</p>
+                <h2>
+                  {drawn.author ? `@${drawn.author}` : drawn.shortcode}
+                </h2>
+                {drawn.collection ? (
+                  <p className="meta">Collection · {drawn.collection}</p>
+                ) : null}
+                {drawn.caption ? (
+                  <p className="caption">{drawn.caption}</p>
+                ) : null}
+                <a className="open" href={drawn.url} target="_blank" rel="noreferrer">
+                  Open on Instagram
+                </a>
+                <div className="actions">
+                  <button type="button" onClick={() => mark(drawn.id, 'completed')}>
+                    Completed
+                  </button>
+                  <button type="button" onClick={() => mark(drawn.id, 'wont_do')}>
+                    Won&apos;t do
+                  </button>
+                  {drawn.status !== 'todo' ? (
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => mark(drawn.id, 'todo')}
+                    >
+                      Undo
+                    </button>
+                  ) : null}
+                  <button type="button" className="ghost" onClick={handleDraw}>
+                    Draw again
+                  </button>
+                </div>
+              </article>
+            ) : (
+              <div className="drawn empty">
+                <p>Press Draw when you&apos;re ready.</p>
+              </div>
+            )}
+          </section>
+
+          <section className="panel stats-panel" aria-labelledby="stats-heading">
+            <h2 id="stats-heading">Library stats</h2>
+            <p className="hint">
+              Patterns across every saved post in this browser — including
+              completed and won&apos;t do.
+            </p>
+            {posts.length === 0 ? (
+              <p className="empty-list">Import some saves to see patterns here.</p>
+            ) : (
+              <>
+              <ul className="stats-grid">
+                <li className="stat-oldest">
+                  <p className="stats-label">Oldest save</p>
+                  {stats.oldest ? (
+                    <>
+                      <a href={stats.oldest.url} target="_blank" rel="noreferrer">
+                        {stats.oldest.author
+                          ? breakableHandle(stats.oldest.author)
+                          : stats.oldest.shortcode}
+                      </a>
+                      <p className="stats-detail">
+                        Saved {formatWhen(stats.oldest.savedAt)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="stats-value muted">No save dates yet</p>
+                  )}
+                </li>
+                <li className="stat-word">
+                  <p className="stats-label">Top word</p>
+                  {stats.topWord ? (
+                    <>
+                      <p className="stats-value">{stats.topWord.value}</p>
+                      <p className="stats-detail">
+                        {stats.topWord.count} time
+                        {stats.topWord.count === 1 ? '' : 's'} in descriptions
+                      </p>
+                    </>
+                  ) : (
+                    <p className="stats-value muted">No description text yet</p>
+                  )}
+                </li>
+                <li className="stat-month">
+                  <p className="stats-label">Busiest month</p>
+                  {stats.busiestMonth ? (
+                    <>
+                      <p className="stats-value">{stats.busiestMonth.label}</p>
+                      <p className="stats-detail">
+                        {stats.busiestMonth.count} save
+                        {stats.busiestMonth.count === 1 ? '' : 's'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="stats-value muted">No save dates yet</p>
+                  )}
+                </li>
+                <li className="stat-tag">
+                  <p className="stats-label">Popular hashtag</p>
+                  {stats.topHashtag ? (
+                    <>
+                      <p className="stats-value">{stats.topHashtag.value}</p>
+                      <p className="stats-detail">
+                        in {stats.topHashtag.count} post
+                        {stats.topHashtag.count === 1 ? '' : 's'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="stats-value muted">No hashtags found</p>
+                  )}
+                </li>
+              </ul>
+              <LibraryCharts posts={posts} />
+              </>
+            )}
           </section>
 
           <section className="panel list-panel" aria-labelledby="list-heading">

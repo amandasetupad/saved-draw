@@ -152,11 +152,137 @@ export interface BusiestMonthStat {
   count: number
 }
 
+export interface MonthBar {
+  year: number
+  /** 0–11, local calendar month. */
+  month: number
+  label: string
+  count: number
+}
+
+export interface CategorySlice {
+  label: string
+  count: number
+}
+
 export interface LibraryStats {
   oldest: OldestPostStat | null
   topWord: CountedStat | null
   busiestMonth: BusiestMonthStat | null
   topHashtag: CountedStat | null
+  /** Reels when the library has any; otherwise every dated save. */
+  chartSubject: 'reels' | 'saves'
+  reelsByMonth: MonthBar[]
+  reelCategories: CategorySlice[]
+}
+
+const CATEGORIES: { label: string; words: string[] }[] = [
+  {
+    label: 'Food',
+    words: ['food', 'recipe', 'cooking', 'baking', 'dinner', 'foodie', 'chef', 'restaurant', 'cake'],
+  },
+  {
+    label: 'Fashion',
+    words: ['fashion', 'outfit', 'ootd', 'style', 'streetstyle', 'wardrobe'],
+  },
+  {
+    label: 'Beauty',
+    words: ['makeup', 'skincare', 'beauty', 'hair', 'nails', 'cosmetic'],
+  },
+  {
+    label: 'Home',
+    words: ['home', 'interior', 'decor', 'renovation', 'diy', 'furniture'],
+  },
+  {
+    label: 'Travel',
+    words: ['travel', 'trip', 'vacation', 'wanderlust', 'hotel', 'city'],
+  },
+  {
+    label: 'Fitness',
+    words: ['fitness', 'workout', 'gym', 'yoga', 'running'],
+  },
+  {
+    label: 'Art',
+    words: ['art', 'design', 'illustration', 'photography', 'drawing'],
+  },
+  {
+    label: 'Music',
+    words: ['music', 'song', 'concert', 'playlist'],
+  },
+]
+
+export function isReelUrl(url: string): boolean {
+  return /\/reel\//i.test(url)
+}
+
+function keywordHits(tokens: Set<string>, keyword: string): boolean {
+  if (tokens.has(keyword)) return true
+  if (keyword.length < 4) return false
+  for (const token of tokens) {
+    if (token.includes(keyword)) return true
+  }
+  return false
+}
+
+/** One category per post, from hashtags and caption words. */
+export function categoryForPost(post: Pick<SavedPost, 'caption' | 'hashtags'>): string {
+  const tokens = new Set<string>([
+    ...collectHashtags(post),
+    ...(post.caption ? tokenizeDescription(post.caption) : []),
+  ])
+  let best: { label: string; score: number } | null = null
+  for (const category of CATEGORIES) {
+    let score = 0
+    for (const word of category.words) {
+      if (keywordHits(tokens, word)) score += 1
+    }
+    if (score > 0 && (!best || score > best.score)) {
+      best = { label: category.label, score }
+    }
+  }
+  return best?.label ?? 'Other'
+}
+
+function monthSeries(posts: SavedPost[]): MonthBar[] {
+  const dated = posts.filter((post) => post.savedAt != null)
+  if (dated.length === 0) return []
+
+  const counts = new Map<string, number>()
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+  for (const post of dated) {
+    const savedAt = post.savedAt as number
+    const { year, month, key } = monthKey(savedAt)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+    const index = year * 12 + month
+    if (index < min) min = index
+    if (index > max) max = index
+  }
+
+  const bars: MonthBar[] = []
+  for (let index = min; index <= max; index += 1) {
+    const year = Math.floor(index / 12)
+    const month = index % 12
+    const key = `${year}-${String(month).padStart(2, '0')}`
+    bars.push({
+      year,
+      month,
+      label: monthLabel(year, month),
+      count: counts.get(key) ?? 0,
+    })
+  }
+  return bars
+}
+
+function categorySlices(posts: SavedPost[]): CategorySlice[] {
+  const counts = new Map<string, number>()
+  for (const post of posts) {
+    const label = categoryForPost(post)
+    counts.set(label, (counts.get(label) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
 }
 
 function normalizeHashtag(raw: string): string {
@@ -214,6 +340,9 @@ export function computeLibraryStats(posts: SavedPost[]): LibraryStats {
       topWord: null,
       busiestMonth: null,
       topHashtag: null,
+      chartSubject: 'saves',
+      reelsByMonth: [],
+      reelCategories: [],
     }
   }
 
@@ -293,5 +422,27 @@ export function computeLibraryStats(posts: SavedPost[]): LibraryStats {
     }
   }
 
-  return { oldest, topWord, busiestMonth, topHashtag }
+  const charts = chartsFromPosts(posts)
+
+  return {
+    oldest,
+    topWord,
+    busiestMonth,
+    topHashtag,
+    ...charts,
+  }
+}
+
+/** Reels when the library has any; otherwise every save. */
+export function chartsFromPosts(posts: SavedPost[]): Pick<
+  LibraryStats,
+  'chartSubject' | 'reelsByMonth' | 'reelCategories'
+> {
+  const reels = posts.filter((post) => isReelUrl(post.url))
+  const chartPosts = reels.length > 0 ? reels : posts
+  return {
+    chartSubject: reels.length > 0 ? 'reels' : 'saves',
+    reelsByMonth: monthSeries(chartPosts),
+    reelCategories: categorySlices(chartPosts),
+  }
 }
